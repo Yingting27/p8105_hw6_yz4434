@@ -114,3 +114,85 @@ model_results |>
 
 ### Problem 2
 
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2022-01-01",
+    date_max = "2022-12-31") |>
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) |>
+  select(name, id, everything())
+```
+
+
+
+Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of these two quantities. Plot the distribution of your estimates, and describe these in words. Using the 5000 bootstrap estimates, identify the 2.5% and 97.5% quantiles to provide a 95% confidence interval for r̂ 2 and log(β̂ 0∗β̂ 1)
+
+
+#### R hat square 
+```{r}
+# Create sample
+boot_sample = function(df) {
+  
+  sample_frac(df, replace = TRUE)
+  
+}
+
+
+r_squared = 
+  tibble(strap_number = 1:5000) |> 
+  mutate(
+    strap_sample = map(strap_number, \(i) boot_sample(weather_df)),
+    models = map(strap_sample, \(df) lm(tmax ~ tmin + prcp, data = df)),
+    results = map(models, broom::glance)
+  ) |> 
+  select(strap_number, results) |> 
+  unnest(results)
+
+r_squared
+
+r_squared_plot = 
+  r_squared|> 
+  ggplot(aes(x = r.squared)) + geom_density()+
+  labs(
+    title = "The distribution of R hat square",
+    x = "R hat square",
+    y = "Density"
+  )
+
+r_squared_plot
+
+
+```
+
+#### log(β̂ 1∗β̂ 2)
+```{r}
+# Create sample
+
+log_beta = 
+  tibble(strap_number = 1:5000) |> 
+  mutate(
+    strap_sample = map(strap_number, \(i) boot_sample(weather_df)),
+    models = map(strap_sample, \(df) lm(tmax ~ tmin + prcp, data = df)),
+    results = map(models, broom::tidy)
+  ) |> 
+  select(strap_number, results) |> 
+  unnest(results) |> select(strap_number, term, estimate) |> 
+  pivot_wider(
+    names_from = term,
+    values_from = estimate
+  ) |> 
+  rename(
+    beta1 = tmin,
+    beta2 = prcp
+  ) |> mutate(
+    log_b1_b2 = log(beta1*beta2)
+  )
+
+```
+
+
