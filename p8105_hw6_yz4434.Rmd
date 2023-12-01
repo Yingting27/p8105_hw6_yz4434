@@ -244,11 +244,12 @@ sum(is.na(birthweight_df))
 ```
 
 
-Description: According to this dataset, we can see that there are only three variable are categorical variables, including the sex of babies and races from patients. In this case, I would like to change them into factor with showing them in different level of characters. Besides that, I delete all redundant categories in race which doesn't occur in this dataset. After checking this dataset, there is no missing data.
+Description: According to this dataset, we can see that there are only three variable are categorical variables, including `babysex`, `frace`, and `mrace`. In this case, I would like to change them into factor with showing them in different level of characters. Besides that, I delete all redundant categories in race which doesn't occur in this dataset. After checking this dataset, there is no missing data.
 
 #### Propose a regression model for birthweight
 The hypothesis I would like to create is to explore whether the factors of mother,
-including  mother's pre-pregnancy weight, weight gain during pregnancy, the age at delivery, with babies' race which depends on parents' races and the level of family income which directly determines the nutritional intake of the mother during pregnancy.Smoking during pregnancy might affect birthweight as well.
+including `ppwt` mother's pre-pregnancy weight, `wtgain`weight gain during pregnancy, `momage` the age at delivery, with babies' race which depends on parents' races `frace` & `mrace` and the level of family income `fincome` which directly determines the nutritional intake of the mother during pregnancy. `smoken` Smoking during pregnancy might affect birthweight as well.
+
 
 ```{r}
 # Create my models based on the hypothesis above
@@ -335,4 +336,4 @@ comparison |>
   )
 ```
 
-
+From the plot, it seems that mod1 has the lowest range of rmse values, indicating that it might be the most consistent or accurate model among the three. The other two models, mod and mod2, show wider distributions of rmse values, suggesting more variability in their performance.
