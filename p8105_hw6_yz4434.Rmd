@@ -135,28 +135,44 @@ Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of 
 
 #### R hat square 
 ```{r}
-# Create sample
+# Create r square and log beta
 boot_sample = function(df) {
   
   sample_frac(df, replace = TRUE)
   
 }
 
-
-r_squared = 
+results = 
   tibble(strap_number = 1:5000) |> 
   mutate(
     strap_sample = map(strap_number, \(i) boot_sample(weather_df)),
     models = map(strap_sample, \(df) lm(tmax ~ tmin + prcp, data = df)),
-    results = map(models, broom::glance)
+    result_r = map(models, broom::glance),
+    result_log_beta = map(models, broom::tidy)
   ) |> 
-  select(strap_number, results) |> 
-  unnest(results)
+  unnest(result_log_beta) |> select(term,estimate, result_r) |> 
+  unnest(result_r) |> select(term, estimate, r.squared) |> 
+    pivot_wider(
+    names_from = term,
+    values_from = estimate
+  ) |> 
+  rename(
+    beta1 = tmin,
+    beta2 = prcp
+  ) |> mutate(
+    log_b1_b2 = log(beta1*beta2)
+  )
 
-r_squared
+
+```
+
+
+#### Distribution of r square and log(β̂ 1∗β̂ 2)
+```{r}
+# R square distribution
 
 r_squared_plot = 
-  r_squared|> 
+  results|> 
   ggplot(aes(x = r.squared)) + geom_density()+
   labs(
     title = "The distribution of R hat square",
@@ -169,30 +185,42 @@ r_squared_plot
 
 ```
 
-#### log(β̂ 1∗β̂ 2)
-```{r}
-# Create sample
+Description: According to the output of density, we can see that the plot shows a unimodal distribution, meaning there is one peak, and it seems to be normally distributed around the peak. The highest density of R-squared values is just above 0.92, indicating that most of the R-squared values from the bootstrap samples or model runs are clustered around this region. The density smoothly decreases as the values move away from the peak on either side.
 
-log_beta = 
-  tibble(strap_number = 1:5000) |> 
-  mutate(
-    strap_sample = map(strap_number, \(i) boot_sample(weather_df)),
-    models = map(strap_sample, \(df) lm(tmax ~ tmin + prcp, data = df)),
-    results = map(models, broom::tidy)
-  ) |> 
-  select(strap_number, results) |> 
-  unnest(results) |> select(strap_number, term, estimate) |> 
-  pivot_wider(
-    names_from = term,
-    values_from = estimate
-  ) |> 
-  rename(
-    beta1 = tmin,
-    beta2 = prcp
-  ) |> mutate(
-    log_b1_b2 = log(beta1*beta2)
+
+```{r}
+# log(β̂ 1∗β̂ 2) distribution
+
+log_beta_plot = 
+  results |> 
+  ggplot(aes(x = log_b1_b2)) + geom_density()+
+  labs(
+    title = "The distribution of log(β̂ 1∗β̂ 2)",
+    x = "log(β̂ 1∗β̂ 2)",
+    y = "Density"
   )
 
+log_beta_plot
 ```
 
+Description: The plot indicates that the logarithmic values range approximately from -12 to -4, which looks like a left-skewed distribution. The distribution has a single peak, suggesting that most of the log-transformed products of β1 and β2 are concentrated around this peak. The peak of the distribution is around -6, which is where the highest density of observations is found. The density decreases as the values move away from the peak on either side.
+
+#### Construct Confidence Interval
+
+```{r}
+ci_results = 
+  results|> select(r.squared, log_b1_b2) |> 
+  pivot_longer(
+    r.squared:log_b1_b2,
+    names_to = "type",
+    values_to = "estimate"
+  ) |> 
+  group_by(type) |> 
+  summarize(
+    ci_lower = quantile(estimate, 0.025, na.rm = TRUE),
+    ci_upper = quantile(estimate, 0.975, na.rm = TRUE)
+  )
+
+ci_results
+```
 
