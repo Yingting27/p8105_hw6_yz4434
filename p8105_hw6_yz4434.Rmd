@@ -133,7 +133,6 @@ weather_df =
 Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of these two quantities. Plot the distribution of your estimates, and describe these in words. Using the 5000 bootstrap estimates, identify the 2.5% and 97.5% quantiles to provide a 95% confidence interval for r̂ 2 and log(β̂ 0∗β̂ 1)
 
 
-#### R hat square 
 ```{r}
 # Create r square and log beta
 boot_sample = function(df) {
@@ -223,4 +222,117 @@ ci_results =
 
 ci_results
 ```
+
+
+### Problem 3
+
+Import Data
+```{r}
+birthweight_df = 
+  read_csv("data/birthweight.csv", na = c("", "NA", "Unknown")) |> 
+  mutate(
+    babysex = as.factor(babysex),
+    babysex = recode(babysex, "1" ="male", "2"="female" ),
+    mrace = as.factor(mrace),
+    mrace = recode(mrace, "1" ="White", "2"="Black", "3" = "Asian"),
+    frace = as.factor(frace),
+    frace = recode(frace, "1" ="White", "2"="Black", "3" = "Asian"))
+
+
+# Check for NA values
+sum(is.na(birthweight_df))
+```
+
+
+Description: According to this dataset, we can see that there are only three variable are categorical variables, including the sex of babies and races from patients. In this case, I would like to change them into factor with showing them in different level of characters. Besides that, I delete all redundant categories in race which doesn't occur in this dataset. After checking this dataset, there is no missing data.
+
+#### Propose a regression model for birthweight
+The hypothesis I would like to create is to explore whether the factors of mother,
+including  mother's pre-pregnancy weight, weight gain during pregnancy, the age at delivery, with babies' race which depends on parents' races and the level of family income which directly determines the nutritional intake of the mother during pregnancy.Smoking during pregnancy might affect birthweight as well.
+
+```{r}
+# Create my models based on the hypothesis above
+mod = lm(bwt ~ ppwt + wtgain + momage + frace + mrace + 
+           fincome + smoken, data = birthweight_df)
+```
+
+```{r}
+birthweight_df = 
+  birthweight_df |> 
+  add_predictions(mod) |> 
+  add_residuals(mod)
+
+my_plot = birthweight_df |> 
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point() +
+  xlab("Fitted Values") +
+  ylab("Residuals") +
+  ggtitle("Residuals vs Fitted Values")
+
+my_plot
+
+```
+
+#### Comparing models
+
+```{r}
+# Create the models
+mod1 = lm(bwt ~ blength + gaweeks, data = birthweight_df)
+mod2 = lm(bwt ~ bhead * blength * babysex, data = birthweight_df)
+```
+
+```{r}
+# Cross-validation
+cv_df = 
+  crossv_mc(birthweight_df, 100) |> 
+    mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+  )
+
+# Apply each model to all training datasets, and evaluate on all testing datasets
+cv_results =
+  cv_df |> 
+  mutate(
+    mod = map(train, \(birthweight_df) lm(bwt ~ ppwt + wtgain + momage + frace + mrace + fincome + smoken, data = birthweight_df)),
+    mod1 = map(train, \(birthweight_df) lm(bwt ~ blength + gaweeks, data = birthweight_df)),
+    mod2 = map(train, \(df) lm(bwt ~ bhead * blength * babysex, data = birthweight_df))
+  ) |> 
+  mutate(
+    rmse_mod = map2_dbl(mod, test, \(mod, df) rmse(mod, df)),
+    rmse_mod1 = map2_dbl(mod1, test, \(mod, df) rmse(mod, df)),
+    rmse_mod2 = map2_dbl(mod2, test, \(mod, df) rmse(mod, df))
+  )
+
+  
+```
+
+```{r}
+comparison = cv_results |> 
+  select(starts_with("rmse")) |> 
+  pivot_longer(
+    everything(),
+    names_to = "model_type",
+    values_to = "rmse",
+    names_prefix = "rmse_"
+  ) 
+
+comparison_mean = 
+  comparison|> 
+  group_by(model_type) |> 
+  summarize(m_rmse = mean(rmse))
+
+comparison_mean
+
+# Comparing models in plots
+
+comparison |> 
+  ggplot(aes(x = model_type, y = rmse)) +
+  geom_violin() +
+  labs(
+    title = "Comparison: rmse of 3 Different Models",
+    x = "Model Type"
+  )
+```
+
 
